@@ -5,40 +5,121 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Guinness in Reykjavík</title>
 
-  <!-- Leaflet (map library) -->
   <link
     rel="stylesheet"
     href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
     integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
     crossorigin=""
   />
+
   <style>
     body { margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; }
     #map { height: 100vh; }
+
     .panel {
-      position: absolute; z-index: 1000; top: 12px; left: 12px;
-      background: white; padding: 10px 12px; border-radius: 12px;
-      box-shadow: 0 8px 30px rgba(0,0,0,0.12);
-      max-width: 340px;
+      position: absolute;
+      z-index: 1000;
+      top: 12px;
+      left: 12px;
+      right: 12px;
+      max-width: 420px;
+
+      background: #0b0b0b;
+      color: #f7f2e7;
+      padding: 12px 14px;
+      border-radius: 14px;
+      box-shadow: 0 10px 35px rgba(0,0,0,0.35);
+      border: 1px solid rgba(211, 163, 74, 0.35);
     }
-    .panel button { margin-right: 8px; }
-    .muted { color: #555; font-size: 13px; line-height: 1.35; }
-    .row { margin-top: 8px; }
-    .badge { display:inline-block; padding: 2px 8px; border-radius: 999px; background:#f2f2f2; font-size: 12px; }
+
+    .muted { color: rgba(247,242,231,0.75); font-size: 13px; line-height: 1.35; }
+    .row { margin-top: 8px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+
+    .badge {
+      display:inline-block;
+      padding: 2px 8px;
+      border-radius: 999px;
+      background: rgba(211, 163, 74, 0.18);
+      color: #d3a34a;
+      font-size: 12px;
+      vertical-align: middle;
+      margin-left: 6px;
+    }
+
+    button {
+      background: #d3a34a;
+      color: #0b0b0b;
+      border: none;
+      padding: 8px 10px;
+      border-radius: 10px;
+      cursor: pointer;
+      font-weight: 800;
+    }
+    button.secondary {
+      background: rgba(211, 163, 74, 0.18);
+      color: #f7f2e7;
+      border: 1px solid rgba(211, 163, 74, 0.35);
+      font-weight: 700;
+    }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    /* Popup tweaks */
+    .leaflet-popup-content-wrapper { border-radius: 12px; }
+    .leaflet-popup-content { margin: 10px 12px; }
+
+    /* Glow/pulse for “nearest” */
+    @keyframes pulse {
+      0% { filter: drop-shadow(0 0 0 rgba(212,175,55,0.0)); transform: translateY(0); }
+      50% { filter: drop-shadow(0 0 14px rgba(212,175,55,0.9)); transform: translateY(-2px); }
+      100% { filter: drop-shadow(0 0 0 rgba(212,175,55,0.0)); transform: translateY(0); }
+    }
+    .nearest-glow { animation: pulse 1.4s ease-in-out infinite; }
+
+    /* Glow for route lines */
+    .gold-route {
+      filter: drop-shadow(0 0 6px rgba(212,175,55,0.7));
+    }
+
+    /* Numbered crawl stop marker */
+    .stop-badge {
+      background: #0b0b0b;
+      color: #f7f2e7;
+      border: 2px solid #D4AF37;
+      border-radius: 999px;
+      width: 26px;
+      height: 26px;
+      display: grid;
+      place-items: center;
+      font-weight: 900;
+      box-shadow: 0 8px 22px rgba(0,0,0,0.35);
+    }
   </style>
 </head>
+
 <body>
   <div id="map"></div>
+
   <div class="panel">
-    <div><strong>Guinness in Reykjavík</strong> <span class="badge">MVP</span></div>
-    <div class="muted">
-      Add places in the <code>places</code> list. Click “Locate me” to find the nearest.
+    <div>
+      <strong>Guinness in Reykjavík</strong>
+      <span class="badge">MVP+</span>
     </div>
+
+    <div class="muted">
+      Locate yourself, find the nearest pint, switch on <b>Pub crawl</b>, or view <b>Heatmap</b>.
+    </div>
+
     <div class="row">
       <button id="locateBtn">Locate me</button>
       <button id="nearestBtn" disabled>Nearest Guinness</button>
+      <button id="crawlBtn" class="secondary">Pub crawl</button>
+      <button id="heatBtn" class="secondary">Heatmap</button>
+      <button id="clearBtn" class="secondary">Clear</button>
     </div>
-    <div class="row muted" id="status">Tip: open this on your phone and allow location access.</div>
+
+    <div class="row muted" id="status">
+      Tip: open on your phone and allow location access.
+    </div>
   </div>
 
   <script
@@ -47,51 +128,89 @@
     crossorigin=""
   ></script>
 
+  <!-- Heatmap plugin -->
+  <script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
+
   <script>
-    // 1) Put your Guinness places here (name + lat/lng)
-    // Find coords quickly by right-clicking in Google Maps / OSM, or by searching the venue and copying.
+    // Guinness places (name + lat/lng)
     const places = [
-  { name: "Bjórgarðurinn (Fosshotel Reykjavík)", lat: 64.1443921, lng: -21.9095837, note: "Inside Fosshotel (Þórunnartún 1)" },
-  { name: "Tivoli Bar", lat: 64.1481387, lng: -21.9396630, note: "Check it's open" },
-  { name: "The Irishman Pub", lat: 64.1460600, lng: -21.9288000, note: "Klapparstígur 27" },
-  { name: "The English Pub", lat: 64.1475600, lng: -21.9391900, note: "Austurstræti 12" },
-  { name: "American Bar", lat: 64.1477377, lng: -21.9400835, note: "Austurstræti area" },
-  { name: "Den Danske Kro", lat: 64.1463800, lng: -21.9336600, note: "" },
-  { name: "Kaffibarinn", lat: 64.1459583, lng: -21.9313250, note: "Bergstaðastræti" },
-  { name: "Bastard Brew & Food", lat: 64.1456700, lng: -21.9307540, note: "Vegamótastígur 4" },
-  { name: "The Drunk Rabbit", lat: 64.1479790, lng: -21.9402900, note: "Austurstræti 3" },
-  { name: "Veður Bar & Café", lat: 64.14554, lng: -21.92923, note: "Wine, beer & cocktails (Klapparstígur 33)" },
+      { name: "Bjórgarðurinn (Fosshotel Reykjavík)", lat: 64.1443921, lng: -21.9095837, note: "Inside Fosshotel (Þórunnartún 1)" },
+      { name: "Tivoli Bar", lat: 64.1481387, lng: -21.9396630, note: "Check it's open" },
+      { name: "The Irishman Pub", lat: 64.1460600, lng: -21.9288000, note: "Klapparstígur 27" },
+      { name: "The English Pub", lat: 64.1475600, lng: -21.9391900, note: "Austurstræti 12" },
+      { name: "American Bar", lat: 64.1477377, lng: -21.9400835, note: "Austurstræti area" },
+      { name: "Den Danske Kro", lat: 64.1463800, lng: -21.9336600, note: "" },
+      { name: "Kaffibarinn", lat: 64.1459583, lng: -21.9313250, note: "Bergstaðastræti" },
+      { name: "Bastard Brew & Food", lat: 64.1456700, lng: -21.9307540, note: "Vegamótastígur 4" },
+      { name: "The Drunk Rabbit", lat: 64.1479790, lng: -21.9402900, note: "Austurstræti 3" },
+      { name: "Veður Bar & Café", lat: 64.14554, lng: -21.92923, note: "Klapparstígur 33" },
     ];
 
-    // Reykjavík center
+    // Map
     const map = L.map("map").setView([64.1466, -21.9426], 13);
 
-    // Free OpenStreetMap tiles
-    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    // Dark basemap
+    L.tileLayer("https://cartodb-basemaps-{s}.global.ssl.fastly.net/dark_all/{z}/{x}/{y}.png", {
       maxZoom: 19,
-      attribution: '&copy; OpenStreetMap contributors'
+      attribution: '&copy; OpenStreetMap contributors &copy; CARTO'
     }).addTo(map);
 
+    // Layers
     const markersLayer = L.layerGroup().addTo(map);
-    const routeLayer = L.layerGroup().addTo(map);
+    const routeLayer = L.layerGroup().addTo(map); // “nearest” line
+    const crawlLayer = L.layerGroup().addTo(map); // pub crawl route + numbers
+    let heatLayer = null;
 
-    function renderPlaces() {
-      markersLayer.clearLayers();
-      places.forEach(p => {
-        const m = L.marker([p.lat, p.lng]).addTo(markersLayer);
-        m.bindPopup(`<strong>${p.name}</strong>${p.note ? `<br/><span class="muted">${p.note}</span>` : ""}`);
-      });
-    }
-    renderPlaces();
+    // Custom Guinness icon (cache-buster helps on GitHub Pages)
+    const guinnessIcon = L.icon({
+      iconUrl: "./guinness.png?v=7",
+      iconSize: [44, 44],
+      iconAnchor: [22, 44],
+      popupAnchor: [0, -42]
+    });
+
+    // UI
+    const statusEl = document.getElementById("status");
+    const locateBtn = document.getElementById("locateBtn");
+    const nearestBtn = document.getElementById("nearestBtn");
+    const crawlBtn = document.getElementById("crawlBtn");
+    const heatBtn = document.getElementById("heatBtn");
+    const clearBtn = document.getElementById("clearBtn");
 
     // User location
     let userMarker = null;
     let userLatLng = null;
 
-    const statusEl = document.getElementById("status");
-    const locateBtn = document.getElementById("locateBtn");
-    const nearestBtn = document.getElementById("nearestBtn");
+    // Track markers so we can “glow” the nearest
+    const placeMarkers = new Map(); // name -> marker
+    let nearestMarker = null;
 
+    // Modes
+    let crawlOn = false;
+    let heatOn = false;
+
+    function popupHtml(p) {
+      const directionsUrl = `https://www.google.com/maps/dir/?api=1&destination=${p.lat},${p.lng}&travelmode=walking`;
+      return `
+        <strong>${p.name}</strong>
+        ${p.note ? `<br/><span class="muted">${p.note}</span>` : ""}
+        <br/><a href="${directionsUrl}" target="_blank" rel="noopener">Walking directions</a>
+      `;
+    }
+
+    function renderPlaces() {
+      markersLayer.clearLayers();
+      placeMarkers.clear();
+
+      for (const p of places) {
+        const m = L.marker([p.lat, p.lng], { icon: guinnessIcon }).addTo(markersLayer);
+        m.bindPopup(popupHtml(p));
+        placeMarkers.set(p.name, m);
+      }
+    }
+    renderPlaces();
+
+    // Distance helpers
     function haversineMeters(a, b) {
       const R = 6371000;
       const toRad = d => (d * Math.PI) / 180;
@@ -103,47 +222,171 @@
       return 2 * R * Math.asin(Math.sqrt(x));
     }
 
-    // Rough walking time: assume 4.8 km/h (80 m/min)
+    // Rough walking time: assume ~80 m/min (4.8 km/h)
     function walkingMinutesFromMeters(m) {
-      return Math.round(m / 80);
+      return Math.max(1, Math.round(m / 80));
+    }
+
+    function setNearestGlow(placeName) {
+      if (nearestMarker) {
+        const oldEl = nearestMarker.getElement();
+        if (oldEl) oldEl.classList.remove("nearest-glow");
+      }
+      nearestMarker = placeMarkers.get(placeName) || null;
+      if (nearestMarker) {
+        const el = nearestMarker.getElement();
+        if (el) el.classList.add("nearest-glow");
+      }
     }
 
     function findNearestPlace() {
-      if (!userLatLng) return null;
-      if (!places.length) return null;
+      if (!userLatLng || !places.length) return null;
 
       let best = null;
       for (const p of places) {
         const d = haversineMeters(userLatLng, { lat: p.lat, lng: p.lng });
-        if (!best || d < best.distanceMeters) {
-          best = { place: p, distanceMeters: d };
-        }
+        if (!best || d < best.distanceMeters) best = { place: p, distanceMeters: d };
       }
       return best;
     }
 
-    function drawSimpleLine(toPlace) {
+    // Guinness-gold route line
+    function drawGoldRoute(latlngs, dashed = true) {
+      const line = L.polyline(latlngs, {
+        color: "#D4AF37",     // proper Guinness gold
+        weight: 7,
+        opacity: 0.95,
+        dashArray: dashed ? "8 10" : null,
+        lineJoin: "round",
+        className: "gold-route"
+      });
+      line.addTo(routeLayer);
+      return line;
+    }
+
+    function drawNearestLine(toPlace) {
       routeLayer.clearLayers();
-      const line = L.polyline([userLatLng, [toPlace.lat, toPlace.lng]], { weight: 5, opacity: 0.8 });
+      const line = L.polyline([userLatLng, [toPlace.lat, toPlace.lng]], {
+        color: "#D4AF37",
+        weight: 7,
+        opacity: 0.95,
+        dashArray: "8 10",
+        lineJoin: "round",
+        className: "gold-route"
+      });
       line.addTo(routeLayer);
       map.fitBounds(line.getBounds(), { padding: [40, 40] });
     }
 
+    // Pub crawl order:
+    // - If user location exists: start at nearest pub, then keep going to the nearest remaining (“greedy” crawl).
+    // - If not: use the list order as written.
+    function computeCrawlOrder() {
+      const remaining = places.slice();
+
+      if (!userLatLng) return remaining;
+
+      // Start at nearest pub to user
+      let current = userLatLng;
+      const order = [];
+
+      while (remaining.length) {
+        let bestIdx = 0;
+        let bestD = Infinity;
+
+        for (let i = 0; i < remaining.length; i++) {
+          const p = remaining[i];
+          const d = haversineMeters(current, { lat: p.lat, lng: p.lng });
+          if (d < bestD) { bestD = d; bestIdx = i; }
+        }
+
+        const next = remaining.splice(bestIdx, 1)[0];
+        order.push(next);
+        current = { lat: next.lat, lng: next.lng };
+      }
+
+      return order;
+    }
+
+    function drawPubCrawl() {
+      crawlLayer.clearLayers();
+
+      const order = computeCrawlOrder();
+      const latlngs = order.map(p => [p.lat, p.lng]);
+
+      // Draw solid gold crawl line (looks nicer than dashed for “crawl path”)
+      const crawlLine = L.polyline(latlngs, {
+        color: "#D4AF37",
+        weight: 6,
+        opacity: 0.9,
+        lineJoin: "round",
+        className: "gold-route"
+      }).addTo(crawlLayer);
+
+      // Numbered stop badges
+      order.forEach((p, i) => {
+        const num = i + 1;
+        const icon = L.divIcon({
+          className: "",
+          html: `<div class="stop-badge">${num}</div>`,
+          iconSize: [26, 26],
+          iconAnchor: [13, 13]
+        });
+
+        L.marker([p.lat, p.lng], { icon }).addTo(crawlLayer);
+      });
+
+      map.fitBounds(crawlLine.getBounds(), { padding: [40, 40] });
+
+      if (userLatLng) {
+        statusEl.innerHTML = `Pub crawl ready: <strong>${order.length}</strong> stops (starting at the nearest pub to you).`;
+      } else {
+        statusEl.innerHTML = `Pub crawl ready: <strong>${order.length}</strong> stops (list order — tap “Locate me” to start from nearest).`;
+      }
+    }
+
+    function setHeatmap(on) {
+      if (!on) {
+        if (heatLayer) {
+          map.removeLayer(heatLayer);
+          heatLayer = null;
+        }
+        return;
+      }
+
+      // Points: [lat, lng, intensity]
+      const pts = places.map(p => [p.lat, p.lng, 0.8]);
+
+      heatLayer = L.heatLayer(pts, {
+        radius: 35,
+        blur: 25,
+        maxZoom: 17
+      });
+
+      heatLayer.addTo(map);
+    }
+
+    // Buttons
     locateBtn.addEventListener("click", () => {
       if (!navigator.geolocation) {
         statusEl.textContent = "Geolocation not supported in this browser.";
         return;
       }
+
       statusEl.textContent = "Locating…";
+
       navigator.geolocation.getCurrentPosition(
         pos => {
           userLatLng = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+
           if (userMarker) userMarker.remove();
           userMarker = L.circleMarker([userLatLng.lat, userLatLng.lng], { radius: 8 }).addTo(map);
           userMarker.bindPopup("<strong>You are here</strong>").openPopup();
+
           map.setView([userLatLng.lat, userLatLng.lng], 15);
           nearestBtn.disabled = false;
-          statusEl.textContent = "Location found. Tap “Nearest Guinness”.";
+
+          statusEl.textContent = "Location found. Tap “Nearest Guinness” or “Pub crawl”.";
         },
         err => {
           statusEl.textContent = "Could not get location. Make sure you allowed location access.";
@@ -155,22 +398,53 @@
 
     nearestBtn.addEventListener("click", () => {
       routeLayer.clearLayers();
+
       const nearest = findNearestPlace();
       if (!nearest) {
-        statusEl.textContent = places.length
-          ? "No location yet—tap “Locate me” first."
-          : "No places yet—add them to the places list in the code.";
+        statusEl.textContent = "Tap “Locate me” first.";
         return;
       }
 
       const mins = walkingMinutesFromMeters(nearest.distanceMeters);
       const km = (nearest.distanceMeters / 1000).toFixed(2);
 
-      drawSimpleLine(nearest.place);
+      drawNearestLine(nearest.place);
+      setNearestGlow(nearest.place.name);
+
+      const m = placeMarkers.get(nearest.place.name);
+      if (m) m.openPopup();
 
       statusEl.innerHTML =
-        `Nearest: <strong>${nearest.place.name}</strong> — ~${mins} min walk (${km} km as-the-crow-flies). ` +
-        `Click its pin for details.`;
+        `Nearest: <strong>${nearest.place.name}</strong> — ~${mins} min walk (${km} km).`;
+    });
+
+    crawlBtn.addEventListener("click", () => {
+      crawlOn = !crawlOn;
+      crawlBtn.textContent = crawlOn ? "Pub crawl: ON" : "Pub crawl";
+      if (crawlOn) {
+        drawPubCrawl();
+      } else {
+        crawlLayer.clearLayers();
+        statusEl.textContent = "Pub crawl cleared.";
+      }
+    });
+
+    heatBtn.addEventListener("click", () => {
+      heatOn = !heatOn;
+      heatBtn.textContent = heatOn ? "Heatmap: ON" : "Heatmap";
+      setHeatmap(heatOn);
+      statusEl.textContent = heatOn ? "Heatmap enabled." : "Heatmap disabled.";
+    });
+
+    clearBtn.addEventListener("click", () => {
+      routeLayer.clearLayers();
+      crawlLayer.clearLayers();
+      setHeatmap(false);
+      heatOn = false;
+      crawlOn = false;
+      heatBtn.textContent = "Heatmap";
+      crawlBtn.textContent = "Pub crawl";
+      statusEl.textContent = "Cleared routes / modes.";
     });
   </script>
 </body>
