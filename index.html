@@ -92,7 +92,7 @@
       box-shadow: 0 8px 22px rgba(0,0,0,0.35);
     }
 
-    /* Wheel modal (mobile-friendly) */
+    /* Wheel modal (mobile-first, fits screen) */
 .overlay {
   position: fixed;
   inset: 0;
@@ -101,15 +101,21 @@
   align-items: center;
   justify-content: center;
   z-index: 2000;
-  padding: 12px;
+
+  /* Use safe-area padding for iPhones */
+  padding: calc(10px + env(safe-area-inset-top))
+           calc(10px + env(safe-area-inset-right))
+           calc(10px + env(safe-area-inset-bottom))
+           calc(10px + env(safe-area-inset-left));
 }
 
 .modal {
   width: 100%;
-  max-width: 880px;
+  max-width: 860px;
 
-  /* Mobile: take most of the screen but not all */
-  max-height: 92vh;
+  /* IMPORTANT: never exceed the viewport height */
+  max-height: 92dvh;         /* modern mobile browsers */
+  max-height: 92vh;          /* fallback */
   overflow: auto;
 
   background: #0b0b0b;
@@ -136,21 +142,9 @@
   background: rgba(255,255,255,0.03);
 }
 
-/* Keep actions visible on mobile */
-.actions {
-  position: sticky;
-  bottom: 0;
-  background: linear-gradient(to top, rgba(11,11,11,0.98), rgba(11,11,11,0.65));
-  padding-top: 10px;
-  margin-top: 10px;
+/* Remove sticky footer entirely (we removed bottom close button) */
+.actions { display: none; }
 
-  display:flex;
-  gap: 8px;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-}
-
-/* Wheel wrap stays pretty */
 .wheelWrap {
   border-radius: 16px;
   border: 1px solid rgba(211,163,74,0.25);
@@ -162,9 +156,8 @@
 
 /* Desktop layout: wheel + info side-by-side */
 @media (min-width: 780px) {
-  .overlay { padding: 18px; }
-  .modal { padding: 14px; }
   .grid { grid-template-columns: 380px 1fr; align-items: start; }
+  .modal { padding: 14px; }
 }
     }
   </style>
@@ -235,9 +228,7 @@
         </div>
       </div>
 
-      <div class="actions">
-        <button id="wheelCloseBtn2" class="secondary">Close</button>
-      </div>
+      
     </div>
   </div>
 
@@ -570,7 +561,6 @@
     const wheelCanvas   = document.getElementById("wheelCanvas");
     const wheelSpinBtn  = document.getElementById("wheelSpinBtn");
     const wheelCloseBtn = document.getElementById("wheelCloseBtn");
-    const wheelCloseBtn2= document.getElementById("wheelCloseBtn2");
     const letsGoBtn     = document.getElementById("letsGoBtn");
     const wheelResult   = document.getElementById("wheelResult");
 
@@ -840,7 +830,6 @@
     letsGoBtn.addEventListener("click", () => { if (chosenPlace) openDirections(chosenPlace); });
 
     wheelCloseBtn.addEventListener("click", closeWheel);
-    wheelCloseBtn2.addEventListener("click", closeWheel);
     wheelOverlay.addEventListener("click", (e) => { if (e.target === wheelOverlay) closeWheel(); });
 
     // Initial wheel draw
