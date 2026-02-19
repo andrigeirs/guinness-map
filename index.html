@@ -92,50 +92,80 @@
       box-shadow: 0 8px 22px rgba(0,0,0,0.35);
     }
 
-    /* Wheel modal */
-    .overlay {
-      position: fixed;
-      inset: 0;
-      background: rgba(0,0,0,0.65);
-      display: none;
-      align-items: center;
-      justify-content: center;
-      z-index: 2000;
-      padding: 18px;
-    }
-    .modal {
-      width: min(820px, 100%);
-      background: #0b0b0b;
-      color: #f7f2e7;
-      border: 1px solid rgba(211, 163, 74, 0.35);
-      border-radius: 16px;
-      box-shadow: 0 18px 60px rgba(0,0,0,0.55);
-      padding: 14px;
-    }
-    .modal h2 { margin: 0 0 6px 0; font-size: 18px; }
-    .modal .sub { margin: 0 0 12px 0; color: rgba(247,242,231,0.75); font-size: 13px; }
-    .grid { display: grid; grid-template-columns: 1fr; gap: 12px; }
-    @media (min-width: 780px) { .grid { grid-template-columns: 380px 1fr; align-items: start; } }
+    /* Wheel modal (mobile-friendly) */
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.65);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+  padding: 12px;
+}
 
-    .card {
-      border: 1px solid rgba(211, 163, 74, 0.25);
-      border-radius: 14px;
-      padding: 12px;
-      background: rgba(255,255,255,0.03);
-    }
-    .actions { display:flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; margin-top: 10px; }
+.modal {
+  width: 100%;
+  max-width: 880px;
 
-    .big { font-weight: 900; font-size: 16px; margin-top: 8px; }
-    .gold { color: #D4AF37; }
+  /* Mobile: take most of the screen but not all */
+  max-height: 92vh;
+  overflow: auto;
 
-    /* Make wheel look more like your photo: slight vignette + border */
-    .wheelWrap {
-      border-radius: 16px;
-      border: 1px solid rgba(211,163,74,0.25);
-      background:
-        radial-gradient(circle at 50% 45%, rgba(255,255,255,0.06), rgba(0,0,0,0.12) 55%, rgba(0,0,0,0.35)),
-        rgba(255,255,255,0.02);
-      overflow: hidden;
+  background: #0b0b0b;
+  color: #f7f2e7;
+  border: 1px solid rgba(211, 163, 74, 0.35);
+  border-radius: 16px;
+  box-shadow: 0 18px 60px rgba(0,0,0,0.55);
+  padding: 12px;
+}
+
+.modal h2 { margin: 0 0 6px 0; font-size: 18px; }
+.modal .sub { margin: 0 0 10px 0; color: rgba(247,242,231,0.75); font-size: 13px; }
+
+.grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+}
+
+.card {
+  border: 1px solid rgba(211, 163, 74, 0.25);
+  border-radius: 14px;
+  padding: 12px;
+  background: rgba(255,255,255,0.03);
+}
+
+/* Keep actions visible on mobile */
+.actions {
+  position: sticky;
+  bottom: 0;
+  background: linear-gradient(to top, rgba(11,11,11,0.98), rgba(11,11,11,0.65));
+  padding-top: 10px;
+  margin-top: 10px;
+
+  display:flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+/* Wheel wrap stays pretty */
+.wheelWrap {
+  border-radius: 16px;
+  border: 1px solid rgba(211,163,74,0.25);
+  background:
+    radial-gradient(circle at 50% 45%, rgba(255,255,255,0.06), rgba(0,0,0,0.12) 55%, rgba(0,0,0,0.35)),
+    rgba(255,255,255,0.02);
+  overflow: hidden;
+}
+
+/* Desktop layout: wheel + info side-by-side */
+@media (min-width: 780px) {
+  .overlay { padding: 18px; }
+  .modal { padding: 14px; }
+  .grid { grid-template-columns: 380px 1fr; align-items: start; }
+}
     }
   </style>
 </head>
@@ -174,13 +204,11 @@
   <div class="overlay" id="wheelOverlay" role="dialog" aria-modal="true">
     <div class="modal">
       <h2>Spin the wheel 🍺</h2>
-      <p class="sub">Spins ~7 seconds and slows down in the last 3 seconds, then lands on a place.</p>
-
+<!-- <p class="sub">Spins ~7 seconds and slows down in the last 3 seconds, then lands on a place.</p> -->
       <div class="grid">
         <div class="card">
           <div class="wheelWrap">
-            <canvas id="wheelCanvas" width="360" height="360" style="width:100%; height:auto; display:block;"></canvas>
-          </div>
+<canvas id="wheelCanvas" width="320" height="320" style="width:100%; height:auto; display:block;"></canvas>          </div>
 
           <div class="row" style="margin-top:10px;">
             <button id="wheelSpinBtn">Spin</button>
