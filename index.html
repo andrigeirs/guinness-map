@@ -22,7 +22,7 @@
       top: 12px;
       left: 12px;
       right: 12px;
-      max-width: 420px;
+      max-width: 560px;
 
       background: #0b0b0b;
       color: #f7f2e7;
@@ -67,7 +67,7 @@
     .leaflet-popup-content-wrapper { border-radius: 12px; }
     .leaflet-popup-content { margin: 10px 12px; }
 
-    /* Glow/pulse for “nearest” */
+    /* Glow/pulse for “nearest” marker */
     @keyframes pulse {
       0% { filter: drop-shadow(0 0 0 rgba(212,175,55,0.0)); transform: translateY(0); }
       50% { filter: drop-shadow(0 0 14px rgba(212,175,55,0.9)); transform: translateY(-2px); }
@@ -76,9 +76,7 @@
     .nearest-glow { animation: pulse 1.4s ease-in-out infinite; }
 
     /* Glow for route lines */
-    .gold-route {
-      filter: drop-shadow(0 0 6px rgba(212,175,55,0.7));
-    }
+    .gold-route { filter: drop-shadow(0 0 6px rgba(212,175,55,0.7)); }
 
     /* Numbered crawl stop marker */
     .stop-badge {
@@ -93,6 +91,52 @@
       font-weight: 900;
       box-shadow: 0 8px 22px rgba(0,0,0,0.35);
     }
+
+    /* Wheel modal */
+    .overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.65);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 2000;
+      padding: 18px;
+    }
+    .modal {
+      width: min(820px, 100%);
+      background: #0b0b0b;
+      color: #f7f2e7;
+      border: 1px solid rgba(211, 163, 74, 0.35);
+      border-radius: 16px;
+      box-shadow: 0 18px 60px rgba(0,0,0,0.55);
+      padding: 14px;
+    }
+    .modal h2 { margin: 0 0 6px 0; font-size: 18px; }
+    .modal .sub { margin: 0 0 12px 0; color: rgba(247,242,231,0.75); font-size: 13px; }
+    .grid { display: grid; grid-template-columns: 1fr; gap: 12px; }
+    @media (min-width: 780px) { .grid { grid-template-columns: 380px 1fr; align-items: start; } }
+
+    .card {
+      border: 1px solid rgba(211, 163, 74, 0.25);
+      border-radius: 14px;
+      padding: 12px;
+      background: rgba(255,255,255,0.03);
+    }
+    .actions { display:flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; margin-top: 10px; }
+
+    .big { font-weight: 900; font-size: 16px; margin-top: 8px; }
+    .gold { color: #D4AF37; }
+
+    /* Make wheel look more like your photo: slight vignette + border */
+    .wheelWrap {
+      border-radius: 16px;
+      border: 1px solid rgba(211,163,74,0.25);
+      background:
+        radial-gradient(circle at 50% 45%, rgba(255,255,255,0.06), rgba(0,0,0,0.12) 55%, rgba(0,0,0,0.35)),
+        rgba(255,255,255,0.02);
+      overflow: hidden;
+    }
   </style>
 </head>
 
@@ -102,23 +146,70 @@
   <div class="panel">
     <div>
       <strong>Guinness in Reykjavík</strong>
-      <span class="badge">MVP+</span>
+      <span class="badge">Wheel + Crawl + Heat</span>
     </div>
 
     <div class="muted">
-      Locate yourself, find the nearest pint, switch on <b>Pub crawl</b>, or view <b>Heatmap</b>.
+      Locate yourself → nearest pint, spin the wheel, build a pub crawl, or view density heatmap.
     </div>
 
     <div class="row">
       <button id="locateBtn">Locate me</button>
       <button id="nearestBtn" disabled>Nearest Guinness</button>
+
+      <button id="spinBtn" class="secondary">Spin wheel</button>
+
       <button id="crawlBtn" class="secondary">Pub crawl</button>
       <button id="heatBtn" class="secondary">Heatmap</button>
+
       <button id="clearBtn" class="secondary">Clear</button>
     </div>
 
     <div class="row muted" id="status">
-      Tip: open on your phone and allow location access.
+      Tip: “Let’s go!” opens Google Maps walking directions from your current location.
+    </div>
+  </div>
+
+  <!-- Wheel Modal -->
+  <div class="overlay" id="wheelOverlay" role="dialog" aria-modal="true">
+    <div class="modal">
+      <h2>Spin the wheel 🍺</h2>
+      <p class="sub">Spins ~7 seconds and slows down in the last 3 seconds, then lands on a place.</p>
+
+      <div class="grid">
+        <div class="card">
+          <div class="wheelWrap">
+            <canvas id="wheelCanvas" width="360" height="360" style="width:100%; height:auto; display:block;"></canvas>
+          </div>
+
+          <div class="row" style="margin-top:10px;">
+            <button id="wheelSpinBtn">Spin</button>
+            <button id="letsGoBtn" disabled>Let’s go!</button>
+            <button id="wheelCloseBtn" class="secondary">Close</button>
+          </div>
+
+          <div class="big" id="wheelResult">Result: <span class="gold">—</span></div>
+        </div>
+
+        <div class="card">
+          <div style="font-weight:900; margin-bottom:6px;">How it works</div>
+          <div class="muted">
+            1) Spin the wheel<br/>
+            2) It picks a Guinness place and highlights it on the map<br/>
+            3) Tap “Let’s go!” for walking directions in Google Maps
+          </div>
+
+          <div style="margin-top:12px; font-weight:900;">Good to know</div>
+          <div class="muted">
+            - The wheel uses the same list as the map markers.<br/>
+            - If you don’t allow location, Google Maps will still open directions to the destination.
+          </div>
+        </div>
+      </div>
+
+      <div class="actions">
+        <button id="wheelCloseBtn2" class="secondary">Close</button>
+      </div>
     </div>
   </div>
 
@@ -132,7 +223,9 @@
   <script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
 
   <script>
-    // Guinness places (name + lat/lng)
+    // ----------------------------
+    // Places (same list for map + wheel)
+    // ----------------------------
     const places = [
       { name: "Bjórgarðurinn (Fosshotel Reykjavík)", lat: 64.1443921, lng: -21.9095837, note: "Inside Fosshotel (Þórunnartún 1)" },
       { name: "Tivoli Bar", lat: 64.1481387, lng: -21.9396630, note: "Check it's open" },
@@ -146,48 +239,49 @@
       { name: "Veður Bar & Café", lat: 64.14554, lng: -21.92923, note: "Klapparstígur 33" },
     ];
 
-    // Map
+    // ----------------------------
+    // Map setup
+    // ----------------------------
     const map = L.map("map").setView([64.1466, -21.9426], 13);
 
-    // Dark basemap
     L.tileLayer("https://cartodb-basemaps-{s}.global.ssl.fastly.net/dark_all/{z}/{x}/{y}.png", {
       maxZoom: 19,
       attribution: '&copy; OpenStreetMap contributors &copy; CARTO'
     }).addTo(map);
 
-    // Layers
     const markersLayer = L.layerGroup().addTo(map);
-    const routeLayer = L.layerGroup().addTo(map); // “nearest” line
-    const crawlLayer = L.layerGroup().addTo(map); // pub crawl route + numbers
+    const routeLayer   = L.layerGroup().addTo(map); // nearest route
+    const crawlLayer   = L.layerGroup().addTo(map); // crawl route + numbers
     let heatLayer = null;
 
-    // Custom Guinness icon (cache-buster helps on GitHub Pages)
     const guinnessIcon = L.icon({
-      iconUrl: "./guinness.png?v=7",
+      iconUrl: "./guinness.png?v=11", // bump number if GitHub caches
       iconSize: [44, 44],
       iconAnchor: [22, 44],
       popupAnchor: [0, -42]
     });
 
-    // UI
-    const statusEl = document.getElementById("status");
-    const locateBtn = document.getElementById("locateBtn");
-    const nearestBtn = document.getElementById("nearestBtn");
-    const crawlBtn = document.getElementById("crawlBtn");
-    const heatBtn = document.getElementById("heatBtn");
-    const clearBtn = document.getElementById("clearBtn");
-
-    // User location
-    let userMarker = null;
-    let userLatLng = null;
-
-    // Track markers so we can “glow” the nearest
+    // Marker refs
     const placeMarkers = new Map(); // name -> marker
     let nearestMarker = null;
+    let chosenMarker = null;
+
+    // UI
+    const statusEl   = document.getElementById("status");
+    const locateBtn  = document.getElementById("locateBtn");
+    const nearestBtn = document.getElementById("nearestBtn");
+    const spinBtn    = document.getElementById("spinBtn");
+    const crawlBtn   = document.getElementById("crawlBtn");
+    const heatBtn    = document.getElementById("heatBtn");
+    const clearBtn   = document.getElementById("clearBtn");
 
     // Modes
     let crawlOn = false;
     let heatOn = false;
+
+    // User location
+    let userMarker = null;
+    let userLatLng = null;
 
     function popupHtml(p) {
       const directionsUrl = `https://www.google.com/maps/dir/?api=1&destination=${p.lat},${p.lng}&travelmode=walking`;
@@ -210,7 +304,9 @@
     }
     renderPlaces();
 
-    // Distance helpers
+    // ----------------------------
+    // Helpers
+    // ----------------------------
     function haversineMeters(a, b) {
       const R = 6371000;
       const toRad = d => (d * Math.PI) / 180;
@@ -222,7 +318,6 @@
       return 2 * R * Math.asin(Math.sqrt(x));
     }
 
-    // Rough walking time: assume ~80 m/min (4.8 km/h)
     function walkingMinutesFromMeters(m) {
       return Math.max(1, Math.round(m / 80));
     }
@@ -239,6 +334,33 @@
       }
     }
 
+    function clearChosenHighlight() {
+      if (chosenMarker) {
+        const el = chosenMarker.getElement();
+        if (el) el.style.filter = "";
+        chosenMarker = null;
+      }
+    }
+
+    function clearAllVisuals() {
+      routeLayer.clearLayers();
+      crawlLayer.clearLayers();
+      setHeatmap(false);
+      heatOn = false;
+      crawlOn = false;
+      heatBtn.textContent = "Heatmap";
+      crawlBtn.textContent = "Pub crawl";
+      clearChosenHighlight();
+      if (nearestMarker) {
+        const el = nearestMarker.getElement();
+        if (el) el.classList.remove("nearest-glow");
+        nearestMarker = null;
+      }
+    }
+
+    // ----------------------------
+    // Nearest feature
+    // ----------------------------
     function findNearestPlace() {
       if (!userLatLng || !places.length) return null;
 
@@ -250,43 +372,29 @@
       return best;
     }
 
-    // Guinness-gold route line
-    function drawGoldRoute(latlngs, dashed = true) {
-      const line = L.polyline(latlngs, {
-        color: "#D4AF37",     // proper Guinness gold
-        weight: 7,
-        opacity: 0.95,
-        dashArray: dashed ? "8 10" : null,
-        lineJoin: "round",
-        className: "gold-route"
-      });
-      line.addTo(routeLayer);
-      return line;
-    }
-
     function drawNearestLine(toPlace) {
       routeLayer.clearLayers();
+
       const line = L.polyline([userLatLng, [toPlace.lat, toPlace.lng]], {
-        color: "#D4AF37",
+        color: "#D4AF37",     // proper Guinness gold
         weight: 7,
         opacity: 0.95,
         dashArray: "8 10",
         lineJoin: "round",
         className: "gold-route"
       });
+
       line.addTo(routeLayer);
       map.fitBounds(line.getBounds(), { padding: [40, 40] });
     }
 
-    // Pub crawl order:
-    // - If user location exists: start at nearest pub, then keep going to the nearest remaining (“greedy” crawl).
-    // - If not: use the list order as written.
+    // ----------------------------
+    // Pub crawl
+    // ----------------------------
     function computeCrawlOrder() {
       const remaining = places.slice();
-
       if (!userLatLng) return remaining;
 
-      // Start at nearest pub to user
       let current = userLatLng;
       const order = [];
 
@@ -314,7 +422,6 @@
       const order = computeCrawlOrder();
       const latlngs = order.map(p => [p.lat, p.lng]);
 
-      // Draw solid gold crawl line (looks nicer than dashed for “crawl path”)
       const crawlLine = L.polyline(latlngs, {
         color: "#D4AF37",
         weight: 6,
@@ -323,7 +430,6 @@
         className: "gold-route"
       }).addTo(crawlLayer);
 
-      // Numbered stop badges
       order.forEach((p, i) => {
         const num = i + 1;
         const icon = L.divIcon({
@@ -332,19 +438,19 @@
           iconSize: [26, 26],
           iconAnchor: [13, 13]
         });
-
         L.marker([p.lat, p.lng], { icon }).addTo(crawlLayer);
       });
 
       map.fitBounds(crawlLine.getBounds(), { padding: [40, 40] });
 
-      if (userLatLng) {
-        statusEl.innerHTML = `Pub crawl ready: <strong>${order.length}</strong> stops (starting at the nearest pub to you).`;
-      } else {
-        statusEl.innerHTML = `Pub crawl ready: <strong>${order.length}</strong> stops (list order — tap “Locate me” to start from nearest).`;
-      }
+      statusEl.innerHTML = userLatLng
+        ? `Pub crawl ready: <strong>${order.length}</strong> stops (starting nearest to you).`
+        : `Pub crawl ready: <strong>${order.length}</strong> stops (list order — tap “Locate me” to start from nearest).`;
     }
 
+    // ----------------------------
+    // Heatmap
+    // ----------------------------
     function setHeatmap(on) {
       if (!on) {
         if (heatLayer) {
@@ -354,19 +460,14 @@
         return;
       }
 
-      // Points: [lat, lng, intensity]
-      const pts = places.map(p => [p.lat, p.lng, 0.8]);
-
-      heatLayer = L.heatLayer(pts, {
-        radius: 35,
-        blur: 25,
-        maxZoom: 17
-      });
-
+      const pts = places.map(p => [p.lat, p.lng, 0.85]);
+      heatLayer = L.heatLayer(pts, { radius: 35, blur: 25, maxZoom: 17 });
       heatLayer.addTo(map);
     }
 
-    // Buttons
+    // ----------------------------
+    // Locate me
+    // ----------------------------
     locateBtn.addEventListener("click", () => {
       if (!navigator.geolocation) {
         statusEl.textContent = "Geolocation not supported in this browser.";
@@ -386,7 +487,7 @@
           map.setView([userLatLng.lat, userLatLng.lng], 15);
           nearestBtn.disabled = false;
 
-          statusEl.textContent = "Location found. Tap “Nearest Guinness” or “Pub crawl”.";
+          statusEl.textContent = "Location found. Tap “Nearest Guinness”, “Pub crawl”, or “Spin wheel”.";
         },
         err => {
           statusEl.textContent = "Could not get location. Make sure you allowed location access.";
@@ -397,8 +498,6 @@
     });
 
     nearestBtn.addEventListener("click", () => {
-      routeLayer.clearLayers();
-
       const nearest = findNearestPlace();
       if (!nearest) {
         statusEl.textContent = "Tap “Locate me” first.";
@@ -414,19 +513,14 @@
       const m = placeMarkers.get(nearest.place.name);
       if (m) m.openPopup();
 
-      statusEl.innerHTML =
-        `Nearest: <strong>${nearest.place.name}</strong> — ~${mins} min walk (${km} km).`;
+      statusEl.innerHTML = `Nearest: <strong>${nearest.place.name}</strong> — ~${mins} min walk (${km} km).`;
     });
 
     crawlBtn.addEventListener("click", () => {
       crawlOn = !crawlOn;
       crawlBtn.textContent = crawlOn ? "Pub crawl: ON" : "Pub crawl";
-      if (crawlOn) {
-        drawPubCrawl();
-      } else {
-        crawlLayer.clearLayers();
-        statusEl.textContent = "Pub crawl cleared.";
-      }
+      if (crawlOn) drawPubCrawl();
+      else { crawlLayer.clearLayers(); statusEl.textContent = "Pub crawl cleared."; }
     });
 
     heatBtn.addEventListener("click", () => {
@@ -437,15 +531,292 @@
     });
 
     clearBtn.addEventListener("click", () => {
-      routeLayer.clearLayers();
-      crawlLayer.clearLayers();
-      setHeatmap(false);
-      heatOn = false;
-      crawlOn = false;
-      heatBtn.textContent = "Heatmap";
-      crawlBtn.textContent = "Pub crawl";
-      statusEl.textContent = "Cleared routes / modes.";
+      clearAllVisuals();
+      statusEl.textContent = "Cleared routes / modes / highlights.";
     });
+
+    // ----------------------------
+    // Wheel feature (photo-style look + 7s spin, slow last 3s)
+    // ----------------------------
+    const wheelOverlay  = document.getElementById("wheelOverlay");
+    const wheelCanvas   = document.getElementById("wheelCanvas");
+    const wheelSpinBtn  = document.getElementById("wheelSpinBtn");
+    const wheelCloseBtn = document.getElementById("wheelCloseBtn");
+    const wheelCloseBtn2= document.getElementById("wheelCloseBtn2");
+    const letsGoBtn     = document.getElementById("letsGoBtn");
+    const wheelResult   = document.getElementById("wheelResult");
+
+    const wctx = wheelCanvas.getContext("2d");
+
+    let wheelAngle = 0;
+    let spinning = false;
+    let chosenPlace = null;
+
+    // Colors inspired by your wheel photo
+    const W_CREAM = "#D8C29B";
+    const W_BLACK = "#1F1F1F";
+    const W_RED   = "#B0322D";
+    const W_GOLD  = "#D4AF37";
+
+    function drawWheel() {
+      const cx = wheelCanvas.width / 2;
+      const cy = wheelCanvas.height / 2;
+
+      const rOuter = Math.min(cx, cy) - 12;
+      const rHub   = 46;
+
+      const n = places.length;
+      const slice = (Math.PI * 2) / n;
+
+      wctx.clearRect(0, 0, wheelCanvas.width, wheelCanvas.height);
+
+      // Outer rim
+      wctx.beginPath();
+      wctx.arc(cx, cy, rOuter + 6, 0, Math.PI * 2);
+      wctx.fillStyle = "#141414";
+      wctx.fill();
+
+      wctx.beginPath();
+      wctx.arc(cx, cy, rOuter + 2, 0, Math.PI * 2);
+      wctx.strokeStyle = "rgba(216,194,155,0.35)";
+      wctx.lineWidth = 6;
+      wctx.stroke();
+
+      // Slices
+      for (let i = 0; i < n; i++) {
+        const a0 = wheelAngle + i * slice;
+        const a1 = a0 + slice;
+
+        // Accent red wedges occasionally like the photo (tweak pattern if you want)
+        const isAccent = (i % 6 === 2); // gives a few reds, not too many
+        const fill = isAccent ? W_RED : (i % 2 === 0 ? W_CREAM : W_BLACK);
+
+        // Slice wedge
+        wctx.beginPath();
+        wctx.moveTo(cx, cy);
+        wctx.arc(cx, cy, rOuter, a0, a1);
+        wctx.closePath();
+        wctx.fillStyle = fill;
+        wctx.fill();
+
+        // Slice border
+        wctx.strokeStyle = "rgba(0,0,0,0.35)";
+        wctx.lineWidth = 2;
+        wctx.stroke();
+
+        // Text (bold, wheel style)
+        const mid = (a0 + a1) / 2;
+        wctx.save();
+        wctx.translate(cx, cy);
+        wctx.rotate(mid);
+
+        const textColor = (fill === W_BLACK || fill === W_RED) ? "#F4EFE6" : "#2B2B2B";
+        wctx.fillStyle = textColor;
+        wctx.font = "900 12px system-ui";
+        wctx.textAlign = "right";
+        wctx.textBaseline = "middle";
+
+        // Fit label
+        const raw = places[i].name.toUpperCase();
+        const label = raw.length > 20 ? raw.slice(0, 20) + "…" : raw;
+
+        wctx.fillText(label, rOuter - 16, 0);
+        wctx.restore();
+      }
+
+      // “Peg” ticks around edge (like the black pegs in the photo)
+      for (let i = 0; i < n; i++) {
+        const a = wheelAngle + i * slice;
+        const x = cx + Math.cos(a) * (rOuter + 2);
+        const y = cy + Math.sin(a) * (rOuter + 2);
+
+        wctx.beginPath();
+        wctx.arc(x, y, 2.2, 0, Math.PI * 2);
+        wctx.fillStyle = "#0b0b0b";
+        wctx.fill();
+      }
+
+      // Center hub
+      wctx.beginPath();
+      wctx.arc(cx, cy, rHub, 0, Math.PI * 2);
+      wctx.fillStyle = "#0b0b0b";
+      wctx.fill();
+      wctx.strokeStyle = W_GOLD;
+      wctx.lineWidth = 4;
+      wctx.stroke();
+
+      wctx.fillStyle = W_GOLD;
+      wctx.font = "900 14px system-ui";
+      wctx.textAlign = "center";
+      wctx.textBaseline = "middle";
+      wctx.fillText("SPIN", cx, cy);
+
+      // Pointer (top)
+      wctx.beginPath();
+      wctx.moveTo(cx, cy - rOuter - 6);
+      wctx.lineTo(cx - 14, cy - rOuter + 24);
+      wctx.lineTo(cx + 14, cy - rOuter + 24);
+      wctx.closePath();
+      wctx.fillStyle = W_GOLD;
+      wctx.fill();
+      wctx.strokeStyle = "rgba(0,0,0,0.25)";
+      wctx.lineWidth = 2;
+      wctx.stroke();
+    }
+
+    // Which slice is under the top pointer?
+    function pickWheelIndexFromAngle(angle) {
+      const n = places.length;
+      const slice = (Math.PI * 2) / n;
+      const pointerAngle = (-Math.PI / 2);
+
+      let a = (pointerAngle - angle) % (Math.PI * 2);
+      if (a < 0) a += Math.PI * 2;
+
+      return Math.floor(a / slice);
+    }
+
+    function setChosen(place) {
+      chosenPlace = place;
+      wheelResult.innerHTML = `Result: <span class="gold">${place.name}</span>`;
+      letsGoBtn.disabled = false;
+
+      // Highlight on map
+      clearChosenHighlight();
+      const m = placeMarkers.get(place.name);
+      if (m) {
+        chosenMarker = m;
+        map.setView([place.lat, place.lng], 16);
+        m.openPopup();
+
+        const el = m.getElement();
+        if (el) el.style.filter = "drop-shadow(0 0 16px rgba(212,175,55,0.95))";
+      }
+
+      statusEl.innerHTML = `Wheel picked: <strong>${place.name}</strong> 🍺`;
+    }
+
+    // Spin spec:
+    // - total ~7000ms
+    // - last ~3000ms slows down noticeably
+    function spinWheel() {
+      if (spinning) return;
+      spinning = true;
+
+      letsGoBtn.disabled = true;
+      chosenPlace = null;
+      wheelResult.innerHTML = `Result: <span class="gold">—</span>`;
+
+      const totalMs = 7000;
+      const slowMs  = 3000;
+      const fastMs  = totalMs - slowMs;
+
+      const startAngle = wheelAngle;
+
+      // Choose a final landing by selecting an index, then computing an endAngle that places it under the pointer.
+      const targetIndex = Math.floor(Math.random() * places.length);
+
+      const n = places.length;
+      const slice = (Math.PI * 2) / n;
+      const pointerAngle = (-Math.PI / 2);
+
+      // We want: pickWheelIndexFromAngle(endAngle) === targetIndex.
+      // That means: a = pointerAngle - endAngle (normalized) lands in [targetIndex*slice, (targetIndex+1)*slice)
+      // We'll aim for the middle of that slice for nicer landing.
+      const targetMid = (targetIndex + 0.5) * slice;
+      let endAngleDesired = pointerAngle - targetMid;
+
+      // Normalize endAngleDesired to near start angle by adding spins
+      const extraSpins = 8 + Math.floor(Math.random() * 5); // 8–12 full rotations
+      endAngleDesired += extraSpins * Math.PI * 2;
+
+      // Ensure it's ahead of current
+      let endAngle = endAngleDesired;
+      while (endAngle < startAngle + 2 * Math.PI) endAngle += 2 * Math.PI;
+
+      // Two-phase animation:
+      // Phase 1 (fast): almost linear to a "handoff" angle
+      // Phase 2 (slow): ease-out to endAngle
+      const handoffAngle = startAngle + (endAngle - startAngle) * 0.72; // most distance before slowdown
+
+      const t0 = performance.now();
+
+      function easeOutCubic(t) { return 1 - Math.pow(1 - t, 3); }
+
+      function frame(now) {
+        const elapsed = now - t0;
+
+        if (elapsed <= fastMs) {
+          // Phase 1: fast (linear-ish)
+          const t = elapsed / fastMs;
+          wheelAngle = startAngle + (handoffAngle - startAngle) * t;
+        } else {
+          // Phase 2: slow (ease out)
+          const t = Math.min(1, (elapsed - fastMs) / slowMs);
+          const e = easeOutCubic(t);
+          wheelAngle = handoffAngle + (endAngle - handoffAngle) * e;
+        }
+
+        drawWheel();
+
+        if (elapsed < totalMs) {
+          requestAnimationFrame(frame);
+        } else {
+          // Finalize
+          wheelAngle = endAngle % (Math.PI * 2);
+          drawWheel();
+
+          const idx = pickWheelIndexFromAngle(wheelAngle);
+          setChosen(places[idx]);
+
+          spinning = false;
+        }
+      }
+
+      requestAnimationFrame(frame);
+    }
+
+    // Directions: try to include origin= from geolocation; fallback to destination-only
+    function openDirections(place) {
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+          (pos) => {
+            const oLat = pos.coords.latitude;
+            const oLng = pos.coords.longitude;
+            const url = `https://www.google.com/maps/dir/?api=1&origin=${oLat},${oLng}&destination=${place.lat},${place.lng}&travelmode=walking`;
+            window.open(url, "_blank", "noopener");
+          },
+          () => {
+            const url = `https://www.google.com/maps/dir/?api=1&destination=${place.lat},${place.lng}&travelmode=walking`;
+            window.open(url, "_blank", "noopener");
+          },
+          { enableHighAccuracy: true, timeout: 8000 }
+        );
+      } else {
+        const url = `https://www.google.com/maps/dir/?api=1&destination=${place.lat},${place.lng}&travelmode=walking`;
+        window.open(url, "_blank", "noopener");
+      }
+    }
+
+    function openWheel() {
+      wheelOverlay.style.display = "flex";
+      drawWheel();
+    }
+    function closeWheel() {
+      wheelOverlay.style.display = "none";
+    }
+
+    // Wheel UI bindings
+    spinBtn.addEventListener("click", openWheel);
+    wheelSpinBtn.addEventListener("click", spinWheel);
+    letsGoBtn.addEventListener("click", () => { if (chosenPlace) openDirections(chosenPlace); });
+
+    wheelCloseBtn.addEventListener("click", closeWheel);
+    wheelCloseBtn2.addEventListener("click", closeWheel);
+    wheelOverlay.addEventListener("click", (e) => { if (e.target === wheelOverlay) closeWheel(); });
+
+    // Initial wheel draw
+    drawWheel();
   </script>
 </body>
 </html>
